@@ -14,7 +14,8 @@ fn main() {
     let bybit = Bybit::new(api_key, api_secret);
 
     // TODO: read the current delta
-    bybit.query_asset_info();
+    let result = bybit.query_asset_info();
+    dbg!(result);
 
     // TODO: check if it is needed to add or reduce positions
 

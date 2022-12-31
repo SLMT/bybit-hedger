@@ -1,10 +1,32 @@
 use hmac::{Hmac, Mac};
 use reqwest::blocking::Client;
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
 use crate::utils;
 
-const RECV_WINDOW: &'static str = "5000";
+const RECV_WINDOW: &str = "5000";
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetInfo {
+    base_coin: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetInfoList {
+    result_total_size: i32,
+    data_list: Vec<AssetInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Response<T> {
+    ret_code: i32,
+    ret_msg: String,
+    result: T,
+}
 
 pub struct Bybit {
     api_key: String,
@@ -19,7 +41,7 @@ impl Bybit {
         }
     }
 
-    pub fn query_asset_info(&self) {
+    pub fn query_asset_info(&self) -> Response<AssetInfoList> {
         let request_body = "{}";
         let timestamp = utils::get_unix_epoch_millis();
         let signature = self.sign(request_body, timestamp);
@@ -37,7 +59,9 @@ impl Bybit {
             .send()
             .expect("fails to send the request");
 
-        println!("{}", response.text().unwrap());
+        // Parse the response
+        let response_body = response.text().expect("cannot read the response body");
+        serde_json::from_str(&response_body).expect("cannot parse the response body")
     }
 
     pub fn sign(&self, request_body: &str, timestamp: u128) -> String {
