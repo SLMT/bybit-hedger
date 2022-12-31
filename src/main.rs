@@ -1,8 +1,9 @@
 mod bybit;
 mod utils;
 
-use std::{cmp::Ordering, env};
+use std::{cmp::Ordering, env, thread};
 
+use chrono::{DurationRound, Local, Timelike};
 use dotenv::dotenv;
 
 use bybit::Bybit;
@@ -13,10 +14,12 @@ use rust_decimal::Decimal;
 enum Action {
     Buy(Decimal),
     Sell(Decimal),
-    None,
 }
 
 const SYMBOL: &str = "BTCPERP";
+
+type StdDuration = std::time::Duration;
+type ChDuration = chrono::Duration;
 
 fn main() {
     // Enable logging
@@ -31,32 +34,63 @@ fn main() {
     // Create a client
     let bybit = Bybit::new(api_key, api_secret);
 
-    // Read the current delta
-    let delta = get_current_delta(&bybit);
-    info!("Current delta: {}", delta);
+    loop {
+        info!("Current time: {}", Local::now().format("%F %T"));
 
-    // Check if it is needed to add or reduce positions
-    let action = decide_action(delta);
-    match action {
-        Action::None => info!("Decide to do nothing"),
-        _ => info!("Decide to take action: {:?}", action),
+        // Read the current delta
+        let delta = get_current_delta(&bybit);
+        info!("Current delta: {}", delta);
+
+        // Check if it is needed to add or reduce positions
+        let action = decide_action(delta);
+
+        // Buy or sell contracts
+        if let Some(action) = action {
+            info!("Decide to take action: {:?}", action);
+
+            // Place an order
+            let response = match action {
+                Action::Buy(quantity) => {
+                    bybit.place_market_order_on_perpetual(SYMBOL, "Buy", quantity)
+                }
+                Action::Sell(quantity) => {
+                    bybit.place_market_order_on_perpetual(SYMBOL, "Sell", quantity)
+                }
+            };
+
+            info!(
+                "Order is placed successfully. Order ID: {}.",
+                response.result.order_id
+            );
+
+            info!("Wait for a second to check the order...");
+            thread::sleep(StdDuration::from_secs(1));
+
+            // Check if the order is filled
+            loop {
+                let response = bybit.query_perpetual_order(&response.result.order_id);
+                dbg!(&response);
+                if response.result.data_list[0].order_status == "Filled" {
+                    break;
+                }
+                info!("The order is not filled yet.");
+
+                thread::sleep(StdDuration::from_secs(5));
+            }
+
+            info!("The order is filled.");
+
+            // Check again for the delta
+            let delta = get_current_delta(&bybit);
+            info!("New delta: {}", delta);
+        } else {
+            info!("Decide to do nothing");
+        }
+
+        // Wait for the next time to check
+        let sleep_len = get_duration_to_next_check_time();
+        thread::sleep(sleep_len);
     }
-
-    // Buy or sell contracts
-    let response = match action {
-        Action::Buy(quantity) => {
-            Some(bybit.place_market_order_on_perpetual(SYMBOL, "Buy", quantity))
-        }
-        Action::Sell(quantity) => {
-            Some(bybit.place_market_order_on_perpetual(SYMBOL, "Sell", quantity))
-        }
-        Action::None => None,
-    };
-    dbg!(response);
-
-    // TODO: check again for the delta
-
-    // TODO: good => wait for the next time to check
 }
 
 fn set_logger_level() {
@@ -77,11 +111,23 @@ fn get_current_delta(bybit: &Bybit) -> Decimal {
     list[0].total_delta.parse().unwrap()
 }
 
-fn decide_action(delta: Decimal) -> Action {
+fn decide_action(delta: Decimal) -> Option<Action> {
     let hedging_amount = -delta.round_dp(3);
     match hedging_amount.cmp(&Decimal::ZERO) {
-        Ordering::Greater => Action::Buy(hedging_amount),
-        Ordering::Less => Action::Sell(hedging_amount),
-        Ordering::Equal => Action::None,
+        Ordering::Greater => Some(Action::Buy(hedging_amount)),
+        Ordering::Less => Some(Action::Sell(hedging_amount)),
+        Ordering::Equal => None,
     }
+}
+
+fn get_duration_to_next_check_time() -> StdDuration {
+    let now = Local::now();
+    let target = if now.minute() > 10 {
+        let t = now + ChDuration::hours(1);
+        t.duration_trunc(ChDuration::hours(1)).unwrap() + ChDuration::minutes(10)
+    } else {
+        now.duration_trunc(ChDuration::hours(1)).unwrap() + ChDuration::minutes(10)
+    };
+    info!("Next check time: {}", target.format("%F %T"));
+    (target - now).to_std().unwrap()
 }

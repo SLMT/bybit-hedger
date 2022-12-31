@@ -30,21 +30,33 @@ pub struct AssetInfo {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AssetInfoList {
-    pub result_total_size: i32,
-    pub data_list: Vec<AssetInfo>,
+pub struct OrderPlacingInfo {
+    pub order_id: String,
+    pub order_link_id: String,
+    pub symbol: String,
+    pub order_type: String,
+    pub side: String,
+    pub order_qty: String,
+    pub order_price: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct OrderPlacingInfo {
-    order_id: String,
-    order_link_id: String,
-    symbol: String,
-    order_type: String,
-    side: String,
-    order_qty: String,
-    order_price: String,
+pub struct OrderInfo {
+    pub order_id: String,
+    pub order_link_id: String,
+    pub symbol: String,
+    pub order_type: String,
+    pub side: String,
+    pub order_status: String,
+    pub price: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct List<T> {
+    pub result_total_size: i32,
+    pub data_list: Vec<T>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -68,7 +80,7 @@ impl Bybit {
         }
     }
 
-    pub fn query_asset_info(&self) -> Response<AssetInfoList> {
+    pub fn query_asset_info(&self) -> Response<List<AssetInfo>> {
         self.send_request(
             "{}".to_owned(),
             "https://api.bybit.com/option/usdc/openapi/private/v1/query-asset-info",
@@ -96,6 +108,19 @@ impl Bybit {
         self.send_request(
             request_body,
             "https://api.bybit.com/perpetual/usdc/openapi/private/v1/place-order",
+        )
+    }
+
+    pub fn query_perpetual_order(&self, order_id: &str) -> Response<List<OrderInfo>> {
+        // Build the requedst body
+        let mut parameters = Map::new();
+        parameters.insert("category".to_owned(), Value::String("PERPETUAL".to_owned()));
+        parameters.insert("orderId".to_owned(), Value::String(order_id.to_owned()));
+        let request_body = Value::Object(parameters).to_string();
+
+        self.send_request(
+            request_body,
+            "https://api.bybit.com/option/usdc/openapi/private/v1/query-order-history",
         )
     }
 
