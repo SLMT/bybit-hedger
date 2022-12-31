@@ -10,34 +10,34 @@ const RECV_WINDOW: &str = "5000";
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetInfo {
-    base_coin: String,
-    total_delta: String,
-    total_gamma: String,
-    total_vega: String,
-    total_theta: String,
+    pub base_coin: String,
+    pub total_delta: String,
+    pub total_gamma: String,
+    pub total_vega: String,
+    pub total_theta: String,
     #[serde(rename = "totalRPL")]
-    total_rpl: String,
+    pub total_rpl: String,
     #[serde(rename = "sessionUPL")]
-    session_upl: String,
+    pub session_upl: String,
     #[serde(rename = "sessionRPL")]
-    session_rpl: String,
-    im: String,
-    mm: String,
+    pub session_rpl: String,
+    pub im: String,
+    pub mm: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetInfoList {
-    result_total_size: i32,
-    data_list: Vec<AssetInfo>,
+    pub result_total_size: i32,
+    pub data_list: Vec<AssetInfo>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Response<T> {
-    ret_code: i32,
-    ret_msg: String,
-    result: T,
+    pub ret_code: i32,
+    pub ret_msg: String,
+    pub result: T,
 }
 
 pub struct Bybit {
