@@ -122,7 +122,7 @@ fn decide_action(delta: Decimal) -> Option<Action> {
 
 fn get_duration_to_next_check_time() -> StdDuration {
     let now = Local::now();
-    let target = if now.minute() > 10 {
+    let target = if now.minute() >= 10 {
         let t = now + ChDuration::hours(1);
         t.duration_trunc(ChDuration::hours(1)).unwrap() + ChDuration::minutes(10)
     } else {
