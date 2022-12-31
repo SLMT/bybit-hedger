@@ -1,6 +1,9 @@
 use hmac::{Hmac, Mac};
+use log::trace;
 use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
+use rust_decimal::Decimal;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::{Map, Value};
 use sha2::Sha256;
 
 use crate::utils;
@@ -34,6 +37,18 @@ pub struct AssetInfoList {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct OrderPlacingInfo {
+    order_id: String,
+    order_link_id: String,
+    symbol: String,
+    order_type: String,
+    side: String,
+    order_qty: String,
+    order_price: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Response<T> {
     pub ret_code: i32,
     pub ret_msg: String,
@@ -54,13 +69,50 @@ impl Bybit {
     }
 
     pub fn query_asset_info(&self) -> Response<AssetInfoList> {
-        let request_body = "{}";
+        self.send_request(
+            "{}".to_owned(),
+            "https://api.bybit.com/option/usdc/openapi/private/v1/query-asset-info",
+        )
+    }
+
+    pub fn place_market_order_on_perpetual(
+        &self,
+        symbol: &str,
+        side: &str,
+        quantity: Decimal,
+    ) -> Response<OrderPlacingInfo> {
+        // Build the requedst body
+        let mut parameters = Map::new();
+        parameters.insert("symbol".to_owned(), Value::String(symbol.to_owned()));
+        parameters.insert("orderType".to_owned(), Value::String("Market".to_owned()));
+        parameters.insert("orderFilter".to_owned(), Value::String("Order".to_owned()));
+        parameters.insert("side".to_owned(), Value::String(side.to_owned()));
+        parameters.insert(
+            "orderQty".to_owned(),
+            Value::String(format!("{}", quantity)),
+        );
+        let request_body = Value::Object(parameters).to_string();
+
+        self.send_request(
+            request_body,
+            "https://api.bybit.com/perpetual/usdc/openapi/private/v1/place-order",
+        )
+    }
+
+    fn send_request<T>(&self, request_body: String, url: &str) -> Response<T>
+    where
+        T: DeserializeOwned,
+    {
         let timestamp = utils::get_unix_epoch_millis();
-        let signature = self.sign(request_body, timestamp);
+        let signature = self.sign(&request_body, timestamp);
+
+        trace!("Sending a request to ByBit...");
+        trace!("URL: {}", url);
+        trace!("Request: {}", &request_body);
 
         let client = Client::new();
         let response = client
-            .post("https://api.bybit.com/option/usdc/openapi/private/v1/query-asset-info")
+            .post(url)
             .header("X-BAPI-API-KEY", &self.api_key)
             .header("X-BAPI-SIGN", signature)
             .header("X-BAPI-SIGN-TYPE", "2")
@@ -73,10 +125,13 @@ impl Bybit {
 
         // Parse the response
         let response_body = response.text().expect("cannot read the response body");
+
+        trace!("Get response: {:?}", &response_body);
+
         serde_json::from_str(&response_body).expect("cannot parse the response body")
     }
 
-    pub fn sign(&self, request_body: &str, timestamp: u128) -> String {
+    fn sign(&self, request_body: &str, timestamp: u128) -> String {
         // Create the context for signing
         let context = format!(
             "{}{}{}{}",
