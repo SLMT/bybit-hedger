@@ -11,6 +11,18 @@ const RECV_WINDOW: &str = "5000";
 #[serde(rename_all = "camelCase")]
 pub struct AssetInfo {
     base_coin: String,
+    total_delta: String,
+    total_gamma: String,
+    total_vega: String,
+    total_theta: String,
+    #[serde(rename = "totalRPL")]
+    total_rpl: String,
+    #[serde(rename = "sessionUPL")]
+    session_upl: String,
+    #[serde(rename = "sessionRPL")]
+    session_rpl: String,
+    im: String,
+    mm: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
