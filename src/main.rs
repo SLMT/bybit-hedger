@@ -69,7 +69,6 @@ fn main() {
             // Check if the order is filled
             loop {
                 let response = bybit.query_perpetual_order(&response.result.order_id);
-                dbg!(&response);
                 if response.result.data_list[0].order_status == "Filled" {
                     break;
                 }
@@ -115,7 +114,7 @@ fn decide_action(delta: Decimal) -> Option<Action> {
     let hedging_amount = -delta.round_dp(3);
     match hedging_amount.cmp(&Decimal::ZERO) {
         Ordering::Greater => Some(Action::Buy(hedging_amount)),
-        Ordering::Less => Some(Action::Sell(hedging_amount)),
+        Ordering::Less => Some(Action::Sell(-hedging_amount)),
         Ordering::Equal => None,
     }
 }
